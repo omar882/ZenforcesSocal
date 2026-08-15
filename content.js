@@ -18,11 +18,15 @@ let zenSettingLoaded = false;
 // ============================================================
 
 chrome.storage.local.get(['zenInGyms'], (result) => {
-    zenInGyms = result.zenInGyms || false;
+    zenInGyms =
+        result.zenInGyms || false;
+
     zenSettingLoaded = true;
 
     updateGymPrivacyClass();
+
     setupGymZenButton();
+
     applyGymZen();
 });
 
@@ -32,9 +36,15 @@ chrome.storage.local.get(['zenInGyms'], (result) => {
 // ============================================================
 
 function updateGymPrivacyClass() {
-    if (!zenSettingLoaded) return;
+    if (!zenSettingLoaded) {
+        return;
+    }
 
-    if (isGym && !zenInGyms) {
+
+    if (
+        isGym &&
+        !zenInGyms
+    ) {
         document.documentElement.classList.add(
             'gym-zen-off'
         );
@@ -72,8 +82,7 @@ function getShortVerdict(text) {
     // Accepted
     if (
         t === 'ok' ||
-        t === 'accepted' ||
-        t.includes('accepted')
+        t === 'accepted'
     ) {
         return 'AC';
     }
@@ -173,7 +182,7 @@ function getShortVerdict(text) {
 
 
 // ============================================================
-// 2. CLEAN SUBMISSION TABLE VERDICTS
+// 2. MAIN SUBMISSION TABLE VERDICTS
 // ============================================================
 
 function cleanVerdicts() {
@@ -195,19 +204,10 @@ function cleanVerdicts() {
         }
 
 
-        // #
-        // When
-        // Who
-        // Problem
-        // Lang
-        // Verdict <-- index 5
-        // Time
-        // Memory
         const cell =
             cells[5];
 
 
-        // Works even while hidden
         const text =
             cell.textContent.trim();
 
@@ -239,6 +239,7 @@ function cleanVerdicts() {
                         shortVerdict;
                 }
 
+
                 verdictElement.removeAttribute(
                     'title'
                 );
@@ -256,7 +257,6 @@ function cleanVerdicts() {
             }
 
 
-            // Remove possible tooltip leak
             cell.removeAttribute(
                 'title'
             );
@@ -271,17 +271,15 @@ function cleanVerdicts() {
                 });
 
 
-            // Reveal only after sanitizing
             cell.classList.add(
                 'zen-verdict-safe'
             );
+
 
             return;
         }
 
 
-        // Unknown verdict with testcase information:
-        // keep hidden.
         const containsTestNumber =
             /\b(?:pre)?test\s*#?\s*\d+/i.test(
                 text
@@ -302,18 +300,254 @@ function cleanVerdicts() {
 
 
 // ============================================================
-// 3. BOTTOM-RIGHT POPUP VERDICTS
+// 3. "LAST SUBMISSIONS" SIDEBAR
 //
-// Examples:
+// Screenshot:
 //
-// Wrong answer on test 2
-// -> WA
+// Submission | Time | Verdict
 //
-// Time limit exceeded on test 13
-// -> TLE
+// 387007751 | ... | Wrong answer on test 6
 //
-// This preserves unrelated notifications such as:
-// "Solution to the problem D has been submitted successfully"
+// becomes:
+//
+// 387007751 | ... | WA
+// ============================================================
+
+function cleanLastSubmissions() {
+
+    // Search all tables because Codeforces may put this box
+    // inside slightly different wrappers on different pages.
+    const tables =
+        document.querySelectorAll(
+            'table'
+        );
+
+
+    tables.forEach(table => {
+
+        const rows =
+            Array.from(
+                table.querySelectorAll(
+                    'tr'
+                )
+            );
+
+
+        if (!rows.length) {
+            return;
+        }
+
+
+        // ----------------------------------------------------
+        // Detect:
+        //
+        // Submission | Time | Verdict
+        // ----------------------------------------------------
+
+        let verdictIndex =
+            -1;
+
+
+        for (const row of rows) {
+
+            const cells =
+                Array.from(
+                    row.querySelectorAll(
+                        ':scope > th, :scope > td'
+                    )
+                );
+
+
+            const texts =
+                cells.map(cell =>
+                    cell.textContent
+                        .trim()
+                        .toUpperCase()
+                );
+
+
+            const submissionIndex =
+                texts.indexOf(
+                    'SUBMISSION'
+                );
+
+
+            const timeIndex =
+                texts.indexOf(
+                    'TIME'
+                );
+
+
+            const currentVerdictIndex =
+                texts.indexOf(
+                    'VERDICT'
+                );
+
+
+            if (
+                submissionIndex !== -1 &&
+                timeIndex !== -1 &&
+                currentVerdictIndex !== -1
+            ) {
+                verdictIndex =
+                    currentVerdictIndex;
+
+                break;
+            }
+        }
+
+
+        // Not the Last submissions table.
+        if (verdictIndex === -1) {
+            return;
+        }
+
+
+        // Mark table so CSS knows what it is.
+        table.classList.add(
+            'zen-last-submissions'
+        );
+
+
+        // ----------------------------------------------------
+        // Sanitize every verdict cell
+        // ----------------------------------------------------
+
+        rows.forEach(row => {
+
+            const cells =
+                Array.from(
+                    row.querySelectorAll(
+                        ':scope > th, :scope > td'
+                    )
+                );
+
+
+            if (
+                cells.length <= verdictIndex
+            ) {
+                return;
+            }
+
+
+            const cell =
+                cells[verdictIndex];
+
+
+            // Don't modify header
+            if (
+                cell.textContent
+                    .trim()
+                    .toUpperCase()
+                ===
+                'VERDICT'
+            ) {
+                return;
+            }
+
+
+            const text =
+                cell.textContent.trim();
+
+
+            if (!text) {
+                return;
+            }
+
+
+            const shortVerdict =
+                getShortVerdict(text);
+
+
+            if (shortVerdict) {
+
+                // Preserve link and its styling if one exists.
+                const link =
+                    cell.querySelector(
+                        'a'
+                    );
+
+
+                if (link) {
+
+                    if (
+                        link.textContent.trim()
+                        !==
+                        shortVerdict
+                    ) {
+                        link.textContent =
+                            shortVerdict;
+                    }
+
+
+                    link.removeAttribute(
+                        'title'
+                    );
+
+                } else {
+
+                    if (
+                        cell.textContent.trim()
+                        !==
+                        shortVerdict
+                    ) {
+                        cell.textContent =
+                            shortVerdict;
+                    }
+                }
+
+
+                cell.removeAttribute(
+                    'title'
+                );
+
+
+                cell
+                    .querySelectorAll('[title]')
+                    .forEach(el => {
+                        el.removeAttribute(
+                            'title'
+                        );
+                    });
+
+
+                // Reveal after sanitizing.
+                cell.classList.add(
+                    'zen-last-verdict-safe'
+                );
+
+
+                return;
+            }
+
+
+            // Unknown text containing testcase number:
+            // leave hidden.
+            const containsTestNumber =
+                /\b(?:pre)?test\s*#?\s*\d+/i.test(
+                    text
+                );
+
+
+            if (containsTestNumber) {
+
+                cell.classList.remove(
+                    'zen-last-verdict-safe'
+                );
+
+            } else {
+
+                cell.classList.add(
+                    'zen-last-verdict-safe'
+                );
+            }
+        });
+    });
+}
+
+
+// ============================================================
+// 4. BOTTOM-RIGHT POPUP VERDICTS
 // ============================================================
 
 function cleanVerdictPopups() {
@@ -332,6 +566,7 @@ function cleanVerdictPopups() {
 
 
         if (!entireText) {
+
             notification.classList.add(
                 'zen-toast-safe'
             );
@@ -341,24 +576,20 @@ function cleanVerdictPopups() {
 
 
         const shortVerdict =
-            getShortVerdict(entireText);
+            getShortVerdict(
+                entireText
+            );
 
 
         // ====================================================
-        // THIS POPUP CONTAINS A VERDICT
+        // VERDICT POPUP
         // ====================================================
 
         if (shortVerdict) {
 
-            let replaced = false;
+            let replaced =
+                false;
 
-
-            // ------------------------------------------------
-            // Walk only TEXT NODES.
-            //
-            // This is important because we don't want to
-            // destroy Codeforces' X close button or popup HTML.
-            // ------------------------------------------------
 
             const walker =
                 document.createTreeWalker(
@@ -367,20 +598,28 @@ function cleanVerdictPopups() {
                 );
 
 
-            const textNodes = [];
+            const textNodes =
+                [];
+
 
             let node;
+
 
             while (
                 node = walker.nextNode()
             ) {
-                textNodes.push(node);
+                textNodes.push(
+                    node
+                );
             }
 
 
             for (
-                const textNode of textNodes
+                const textNode
+                of
+                textNodes
             ) {
+
                 const nodeText =
                     textNode.nodeValue.trim();
 
@@ -397,20 +636,19 @@ function cleanVerdictPopups() {
 
 
                 if (nodeVerdict) {
+
                     textNode.nodeValue =
                         nodeVerdict;
 
-                    replaced = true;
+
+                    replaced =
+                        true;
+
 
                     break;
                 }
             }
 
-
-            // ------------------------------------------------
-            // Fallback for Codeforces markup where the whole
-            // message is inside a known message element.
-            // ------------------------------------------------
 
             if (!replaced) {
 
@@ -423,42 +661,41 @@ function cleanVerdictPopups() {
 
 
                 if (messageElement) {
+
                     messageElement.textContent =
                         shortVerdict;
-
-                    replaced = true;
                 }
             }
 
 
-            // Remove testcase-related tooltip leaks
             notification.removeAttribute(
                 'title'
             );
 
 
             notification
-                .querySelectorAll('[title]')
+                .querySelectorAll(
+                    '[title]'
+                )
                 .forEach(el => {
+
                     el.removeAttribute(
                         'title'
                     );
                 });
 
 
-            // Now safe to show
             notification.classList.add(
                 'zen-toast-safe'
             );
+
 
             return;
         }
 
 
         // ====================================================
-        // UNKNOWN TEXT WITH "TEST 123"
-        //
-        // Fail closed: don't show it.
+        // UNKNOWN TESTCASE MESSAGE
         // ====================================================
 
         const containsTestNumber =
@@ -477,15 +714,7 @@ function cleanVerdictPopups() {
         }
 
 
-        // ====================================================
-        // NORMAL NON-VERDICT MESSAGE
-        //
-        // Example:
-        // "Solution has been submitted successfully"
-        //
-        // Show unchanged.
-        // ====================================================
-
+        // Normal notification.
         notification.classList.add(
             'zen-toast-safe'
         );
@@ -494,27 +723,29 @@ function cleanVerdictPopups() {
 
 
 // ============================================================
-// 4. STANDINGS PRIVACY
+// 5. STANDINGS PRIVACY
 //
-// KEEP:
+// Keep:
 //
 // #
 // Who
-// solve count
+// solved
 // Penalty
 //
-// HIDE:
+// Hide:
 //
-// A B C D ...
+// A B C ...
 // ============================================================
 
 function cleanStandings() {
+
     if (!isStandings) {
         return;
     }
 
 
     if (document.body) {
+
         document.body.classList.add(
             'zen-standings'
         );
@@ -528,6 +759,7 @@ function cleanStandings() {
 
 
     tables.forEach(table => {
+
         const rows =
             Array.from(
                 table.querySelectorAll(
@@ -545,7 +777,6 @@ function cleanStandings() {
             -1;
 
 
-        // Find actual standings table
         for (const row of rows) {
 
             const cells =
@@ -580,27 +811,26 @@ function cleanStandings() {
                 whoIndex !== -1 &&
                 currentPenaltyIndex !== -1
             ) {
+
                 penaltyIndex =
                     currentPenaltyIndex;
+
 
                 break;
             }
         }
 
 
-        // Not standings table
         if (penaltyIndex === -1) {
             return;
         }
 
 
-        // Mark actual standings table
         table.classList.add(
             'standings'
         );
 
 
-        // Hide every column after Penalty
         rows.forEach(row => {
 
             const cells =
@@ -617,6 +847,7 @@ function cleanStandings() {
                     if (
                         index > penaltyIndex
                     ) {
+
                         cell.style.setProperty(
                             'display',
                             'none',
@@ -631,10 +862,11 @@ function cleanStandings() {
 
 
 // ============================================================
-// 5. GYM ZEN BUTTON
+// 6. GYM ZEN BUTTON
 // ============================================================
 
 function setupGymZenButton() {
+
     if (!zenSettingLoaded) {
         return;
     }
@@ -651,7 +883,6 @@ function setupGymZenButton() {
     }
 
 
-    // Already added
     if (
         document.getElementById(
             'gym-zen-toggle'
@@ -688,10 +919,6 @@ function setupGymZenButton() {
 
             : '<span style="font-size: 13px;">⚡</span> Gym Zen: <b>OFF</b>';
 
-
-    // ========================================================
-    // STYLE
-    // ========================================================
 
     toggleLink.style.display =
         'inline-block';
@@ -733,10 +960,7 @@ function setupGymZenButton() {
         'all 0.2s ease-in-out';
 
 
-    // ========================================================
-    // HOVER
-    // ========================================================
-
+    // Hover
     toggleLink.addEventListener(
         'mouseenter',
         () => {
@@ -765,10 +989,7 @@ function setupGymZenButton() {
     );
 
 
-    // ========================================================
-    // CLICK
-    // ========================================================
-
+    // Click
     toggleLink.addEventListener(
         'click',
         (e) => {
@@ -783,6 +1004,7 @@ function setupGymZenButton() {
                 },
 
                 () => {
+
                     window.location.reload();
                 }
             );
@@ -802,10 +1024,11 @@ function setupGymZenButton() {
 
 
 // ============================================================
-// 6. APPLY GYM ZEN
+// 7. APPLY GYM ZEN
 // ============================================================
 
 function applyGymZen() {
+
     if (!zenSettingLoaded) {
         return;
     }
@@ -837,7 +1060,7 @@ function applyGymZen() {
                 .toUpperCase();
 
 
-        // Standings intentionally allowed.
+        // Standings stay enabled.
         const tabsToHide = [
             'RATING',
             'RATING CHANGES',
@@ -862,6 +1085,7 @@ function applyGymZen() {
                 tabText
             )
         ) {
+
             link.parentElement.style.setProperty(
                 'display',
                 'none',
@@ -905,6 +1129,7 @@ function applyGymZen() {
                         link.textContent.trim()
                     )
                 ) {
+
                     link.style.setProperty(
                         'display',
                         'none',
@@ -913,11 +1138,7 @@ function applyGymZen() {
                 }
             });
 
-
     } else {
-
-        // Gym Zen OFF.
-        // Restore solve counts inside gyms.
 
         const solvedElements =
             document.querySelectorAll(
@@ -945,6 +1166,7 @@ function applyGymZen() {
                         link.textContent.trim()
                     )
                 ) {
+
                     link.style.removeProperty(
                         'display'
                     );
@@ -955,7 +1177,7 @@ function applyGymZen() {
 
 
 // ============================================================
-// 7. GLOBAL ZEN
+// 8. GLOBAL ZEN
 // ============================================================
 
 function applyGlobalZen() {
@@ -988,6 +1210,7 @@ function applyGlobalZen() {
                 'Contribution:'
             )
         ) {
+
             item.style.setProperty(
                 'display',
                 'none',
@@ -1012,6 +1235,7 @@ function applyGlobalZen() {
                     'Top rated'
                 )
             ) {
+
                 box.style.setProperty(
                     'display',
                     'none',
@@ -1059,7 +1283,6 @@ function applyGlobalZen() {
         )
         .forEach(table => {
 
-            // Don't modify status table
             if (
                 table.classList.contains(
                     'status-frame-datatable'
@@ -1069,7 +1292,15 @@ function applyGlobalZen() {
             }
 
 
-            // Standings handled separately
+            if (
+                table.classList.contains(
+                    'zen-last-submissions'
+                )
+            ) {
+                return;
+            }
+
+
             if (isStandings) {
                 return;
             }
@@ -1110,6 +1341,7 @@ function applyGlobalZen() {
                             text === ''
                         )
                     ) {
+
                         colsToHide.push(
                             index
                         );
@@ -1147,6 +1379,7 @@ function applyGlobalZen() {
                                     index
                                 )
                             ) {
+
                                 cell.style.setProperty(
                                     'display',
                                     'none',
@@ -1161,7 +1394,7 @@ function applyGlobalZen() {
 
 
 // ============================================================
-// 8. HIDE RATING GRAPH
+// 9. HIDE RATING GRAPH
 // ============================================================
 
 function hideRatingGraph() {
@@ -1200,7 +1433,7 @@ function hideRatingGraph() {
 
 
 // ============================================================
-// 9. HIDE "ONLY RATED"
+// 10. HIDE "ONLY RATED"
 // ============================================================
 
 function hideOnlyRated() {
@@ -1216,6 +1449,7 @@ function hideOnlyRated() {
                     'Only rated'
                 )
             ) {
+
                 const form =
                     select.closest(
                         'form'
@@ -1242,12 +1476,7 @@ function hideOnlyRated() {
 
 
 // ============================================================
-// 10. HIDE RATING-RELATED NOTIFICATIONS
-//
-// IMPORTANT:
-//
-// Don't hide verdict popups here.
-// Those are handled by cleanVerdictPopups().
+// 11. HIDE RATING NOTIFICATIONS
 // ============================================================
 
 function hideRatingNotifications() {
@@ -1274,6 +1503,7 @@ function hideRatingNotifications() {
                     'rating'
                 )
             ) {
+
                 notification.style.setProperty(
                     'display',
                     'none',
@@ -1286,7 +1516,7 @@ function hideRatingNotifications() {
 
 
 // ============================================================
-// 11. TALKS / MESSAGES
+// 12. TALKS / MESSAGES
 // ============================================================
 
 function hideRatingMessages() {
@@ -1316,6 +1546,7 @@ function hideRatingMessages() {
                         'rating change'
                     )
             ) {
+
                 row.style.setProperty(
                     'display',
                     'none',
@@ -1327,7 +1558,7 @@ function hideRatingMessages() {
 
 
 // ============================================================
-// 12. RUN ALL CLEANUP
+// 13. RUN EVERYTHING
 // ============================================================
 
 function runZenCleanup() {
@@ -1339,6 +1570,8 @@ function runZenCleanup() {
     cleanStandings();
 
     cleanVerdicts();
+
+    cleanLastSubmissions();
 
     cleanVerdictPopups();
 
@@ -1355,7 +1588,7 @@ function runZenCleanup() {
 
 
 // ============================================================
-// 13. INITIALIZE
+// 14. INITIALIZE
 // ============================================================
 
 function initializeZenMode() {
@@ -1364,6 +1597,7 @@ function initializeZenMode() {
         isStandings &&
         document.body
     ) {
+
         document.body.classList.add(
             'zen-standings'
         );
@@ -1391,14 +1625,16 @@ if (
 
 
 // ============================================================
-// 14. MUTATION OBSERVER
+// 15. MUTATION OBSERVER
 //
-// This is what reacts essentially immediately to:
+// Reacts immediately to:
 //
-// - new verdicts
-// - bottom-right verdict popups
-// - AJAX table updates
-// - dynamically loaded menus
+// - new submissions
+// - verdict changes
+// - Last submissions widget
+// - bottom-right notifications
+// - menus
+// - standings
 // ============================================================
 
 let observerScheduled =
@@ -1439,10 +1675,7 @@ observer.observe(
 
 
 // ============================================================
-// 15. BACKUP SECURITY GUARD
-//
-// MutationObserver should handle almost everything.
-// Keep your 35ms check as backup.
+// 16. BACKUP SECURITY GUARD
 // ============================================================
 
 setInterval(() => {
