@@ -1,42 +1,71 @@
 // ============================================================
-// CODEFORCES ZEN MODE
+// CODEFORCES ZEN
 // ============================================================
 
+const isGym = window.location.pathname.includes('/gym');
+const isStandings = window.location.pathname.includes('/standings');
+
+let zenInGyms = false;
+let zenSettingLoaded = false;
+
 
 // ============================================================
-// 0. EARLY CSS
+// 0. MARK STANDINGS PAGE AS EARLY AS POSSIBLE
 // ============================================================
 
-const zenStyle = document.createElement('style');
-
-zenStyle.textContent = `
-    /* Hide verdict until sanitized */
-    table.status-frame-datatable
-    tr[data-submission-id] > td:nth-child(6) {
-        visibility: hidden !important;
+if (isStandings) {
+    // body may not exist yet at document_start, so we'll also
+    // apply this again later.
+    if (document.body) {
+        document.body.classList.add('zen-standings');
     }
-
-    table.status-frame-datatable
-    tr[data-submission-id] > td:nth-child(6).zen-verdict-safe {
-        visibility: visible !important;
-    }
-`;
-
-document.documentElement.appendChild(zenStyle);
+}
 
 
 // ============================================================
-// 1. VERDICT PRIVACY
+// 1. LOAD GYM ZEN SETTING
+// ============================================================
+
+chrome.storage.local.get(['zenInGyms'], (result) => {
+    zenInGyms = result.zenInGyms || false;
+    zenSettingLoaded = true;
+
+    updateGymPrivacyClass();
+
+    setupGymZenButton();
+    applyGymZen();
+});
+
+
+// ============================================================
+// GYM PRIVACY CLASS
 //
-// "Wrong answer on test 17" -> WA
-// "Time limit exceeded on test 9" -> TLE
-// etc.
+// Solve counts are hidden by CSS by default.
+//
+// Only reveal them if:
+//     we are in /gym/
+//     AND Gym Zen is OFF.
+// ============================================================
+
+function updateGymPrivacyClass() {
+    if (!zenSettingLoaded) return;
+
+    if (isGym && !zenInGyms) {
+        document.documentElement.classList.add('gym-zen-off');
+    } else {
+        document.documentElement.classList.remove('gym-zen-off');
+    }
+}
+
+
+// ============================================================
+// 2. VERDICT SHORTENING
 // ============================================================
 
 function getShortVerdict(text) {
     const t = text.trim().toLowerCase();
 
-    // Already converted
+    // Already sanitized
     if (t === 'ac') return 'AC';
     if (t === 'wa') return 'WA';
     if (t === 'tle') return 'TLE';
@@ -49,7 +78,6 @@ function getShortVerdict(text) {
     if (t === 'jf') return 'JF';
     if (t === 'sv') return 'SV';
 
-    // Accepted
     if (
         t === 'ok' ||
         t === 'accepted'
@@ -134,6 +162,10 @@ function getShortVerdict(text) {
 }
 
 
+// ============================================================
+// CLEAN VERDICTS
+// ============================================================
+
 function cleanVerdicts() {
     const rows = document.querySelectorAll(
         'table.status-frame-datatable tr[data-submission-id]'
@@ -142,26 +174,14 @@ function cleanVerdicts() {
     rows.forEach(row => {
         const cells = row.querySelectorAll(':scope > td');
 
-        if (cells.length < 6) {
-            return;
-        }
+        if (cells.length < 6) return;
 
-        // #
-        // When
-        // Who
-        // Problem
-        // Lang
-        // Verdict <-- 5
-        // Time
-        // Memory
         const cell = cells[5];
 
-        // textContent works even when visibility:hidden
+        // textContent works even while CSS has hidden the cell.
         const text = cell.textContent.trim();
 
-        if (!text) {
-            return;
-        }
+        if (!text) return;
 
         const shortVerdict = getShortVerdict(text);
 
@@ -188,21 +208,20 @@ function cleanVerdicts() {
                 }
             }
 
-            // Remove tooltip leaks
             cell.removeAttribute('title');
 
             cell.querySelectorAll('[title]').forEach(el => {
                 el.removeAttribute('title');
             });
 
-            // Reveal after sanitizing
+            // Reveal only after sanitizing.
             cell.classList.add('zen-verdict-safe');
 
             return;
         }
 
-        // Unknown verdict containing a test number:
-        // keep it hidden.
+        // Unknown status containing "test 17" etc:
+        // do NOT reveal.
         const containsTestNumber =
             /\b(?:pre)?test\s*#?\s*\d+/i.test(text);
 
@@ -215,98 +234,94 @@ function cleanVerdicts() {
 }
 
 
-// Watch AJAX verdict changes
-const verdictObserver = new MutationObserver(() => {
-    cleanVerdicts();
-});
-
-verdictObserver.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-    characterData: true
-});
-
-cleanVerdicts();
-
-
 // ============================================================
-// 2. STANDINGS PRIVACY
+// 3. STANDINGS PRIVACY
 //
-// KEEP:
-// #
-// Who
-// solve count
-// Penalty
+// Keep:
+//     #
+//     Who
+//     Solved
+//     Penalty
 //
-// HIDE:
-// A B C D E F ...
+// Hide:
+//     A B C D ...
 // ============================================================
 
 function cleanStandings() {
-    // Only relevant on standings pages
-    if (!window.location.pathname.includes('/standings')) {
-        return;
+    if (!isStandings) return;
+
+    if (document.body) {
+        document.body.classList.add('zen-standings');
     }
 
     const tables = document.querySelectorAll('table');
 
     tables.forEach(table => {
-        const rows = Array.from(table.querySelectorAll('tr'));
+        const rows = Array.from(
+            table.querySelectorAll('tr')
+        );
 
-        if (rows.length === 0) {
-            return;
-        }
+        if (!rows.length) return;
 
-        let headerRow = null;
         let penaltyIndex = -1;
 
-        // Find actual standings header row
+
+        // ----------------------------------------------------
+        // Find the real standings table via its header.
+        // ----------------------------------------------------
+
         for (const row of rows) {
             const cells = Array.from(
-                row.querySelectorAll(':scope > th, :scope > td')
+                row.querySelectorAll(
+                    ':scope > th, :scope > td'
+                )
             );
 
             const texts = cells.map(cell =>
-                cell.textContent.trim().toUpperCase()
+                cell.textContent
+                    .trim()
+                    .toUpperCase()
             );
 
-            const whoIndex = texts.indexOf('WHO');
-            const pIndex = texts.indexOf('PENALTY');
+            const whoIndex =
+                texts.indexOf('WHO');
+
+            const currentPenaltyIndex =
+                texts.indexOf('PENALTY');
 
             if (
                 whoIndex !== -1 &&
-                pIndex !== -1
+                currentPenaltyIndex !== -1
             ) {
-                headerRow = row;
-                penaltyIndex = pIndex;
+                penaltyIndex =
+                    currentPenaltyIndex;
+
                 break;
             }
         }
 
-        // Not a standings table
-        if (!headerRow || penaltyIndex === -1) {
-            return;
-        }
 
-        // Hide EVERYTHING after Penalty.
-        //
-        // Screenshot layout:
-        //
-        // 0 = #
-        // 1 = Who
-        // 2 = =
-        // 3 = Penalty
-        // 4 = A
-        // 5 = B
-        // ...
-        //
-        // Therefore this keeps:
-        // # | Who | = | Penalty
-        //
-        // and hides all individual problems.
+        // Not a standings table.
+        if (penaltyIndex === -1) return;
+
+
+        // ----------------------------------------------------
+        // Mark it for immediate CSS handling on subsequent
+        // dynamic updates.
+        // ----------------------------------------------------
+
+        table.classList.add('standings');
+
+
+        // ----------------------------------------------------
+        // Hide every problem column.
+        // ----------------------------------------------------
+
         rows.forEach(row => {
             const cells = Array.from(
-                row.querySelectorAll(':scope > th, :scope > td')
+                row.querySelectorAll(
+                    ':scope > th, :scope > td'
+                )
             );
 
             cells.forEach((cell, index) => {
@@ -324,50 +339,21 @@ function cleanStandings() {
 
 
 // ============================================================
-// 3. GYM ZEN
-// ============================================================
-
-const isGym =
-    window.location.href.includes('/gym');
-
-let zenInGyms = false;
-let zenSettingLoaded = false;
-
-
-chrome.storage.local.get(
-    ['zenInGyms'],
-    (result) => {
-        zenInGyms =
-            result.zenInGyms || false;
-
-        zenSettingLoaded = true;
-
-        setupGymZenButton();
-        applyGymZen();
-    }
-);
-
-
-// ============================================================
 // 4. GYM ZEN BUTTON
 // ============================================================
 
 function setupGymZenButton() {
-    if (!zenSettingLoaded) {
-        return;
-    }
+    if (!zenSettingLoaded) return;
 
     const topMenu =
         document.querySelector(
             '.menu-list-container ul'
         );
 
-    // Codeforces hasn't created menu yet
-    if (!topMenu) {
-        return;
-    }
+    if (!topMenu) return;
 
-    // Already exists
+
+    // Already added.
     if (
         document.getElementById(
             'gym-zen-toggle'
@@ -399,7 +385,6 @@ function setupGymZenButton() {
             : '<span style="font-size: 13px;">⚡</span> Gym Zen: <b>OFF</b>';
 
 
-    // Button styling
     toggleLink.style.display =
         'inline-block';
 
@@ -432,7 +417,10 @@ function setupGymZenButton() {
         'all 0.2s ease-in-out';
 
 
+    // --------------------------------------------------------
     // Hover
+    // --------------------------------------------------------
+
     toggleLink.addEventListener(
         'mouseenter',
         () => {
@@ -457,7 +445,10 @@ function setupGymZenButton() {
     );
 
 
-    // Toggle
+    // --------------------------------------------------------
+    // Click
+    // --------------------------------------------------------
+
     toggleLink.addEventListener(
         'click',
         (e) => {
@@ -485,22 +476,22 @@ function setupGymZenButton() {
 // ============================================================
 
 function applyGymZen() {
-    if (!zenSettingLoaded) {
-        return;
-    }
+    if (!zenSettingLoaded) return;
+
+    updateGymPrivacyClass();
 
 
     // Outside gyms:
-    // Zen protections always enabled.
+    // always Zen.
     //
     // Inside gyms:
-    // depends on Gym Zen toggle.
+    // depends on toggle.
     const shouldHideContestData =
         !isGym || zenInGyms;
 
 
     // ========================================================
-    // MENU
+    // MENU ITEMS
     // ========================================================
 
     const menuLinks =
@@ -517,12 +508,7 @@ function applyGymZen() {
                 .toUpperCase();
 
 
-        // IMPORTANT:
-        //
-        // STANDINGS ARE NO LONGER HIDDEN.
-        //
-        // COMMON STANDINGS and FRIENDS STANDINGS
-        // are also visible.
+        // Standings are intentionally NOT hidden anymore.
         const tabsToHide = [
             'RATING',
             'RATING CHANGES',
@@ -532,8 +518,6 @@ function applyGymZen() {
 
 
         if (shouldHideContestData) {
-            // Status still exposes submissions,
-            // so keep hiding it.
             tabsToHide.push(
                 'STATUS'
             );
@@ -554,22 +538,11 @@ function applyGymZen() {
 
 
     // ========================================================
-    // IMPORTANT:
+    // PROBLEM SOLVE COUNTS
     //
-    // We intentionally DO NOT hide:
+    // CSS already hides these BEFORE rendering.
     //
-    // STANDINGS
-    // COMMON STANDINGS
-    // FRIENDS STANDINGS
-    // FINAL STANDINGS
-    // CURRENT STANDINGS
-    //
-    // The standings page itself is sanitized instead.
-    // ========================================================
-
-
-    // ========================================================
-    // HIDE NUMBER OF PEOPLE WHO SOLVED EACH PROBLEM
+    // This JS is only a backup for weird Codeforces markup.
     // ========================================================
 
     if (shouldHideContestData) {
@@ -589,25 +562,57 @@ function applyGymZen() {
         });
 
 
-        const problemTableLinks =
+        // Backup for x123-style links.
+        document
+            .querySelectorAll('.problems a')
+            .forEach(link => {
+
+                if (
+                    /^x\d+$/i.test(
+                        link.textContent.trim()
+                    )
+                ) {
+                    link.style.setProperty(
+                        'display',
+                        'none',
+                        'important'
+                    );
+                }
+            });
+
+    } else {
+
+        // Gym Zen OFF:
+        // undo inline hiding if this script had previously
+        // applied it.
+        const solvedElements =
             document.querySelectorAll(
-                '.problems a'
+                'a[title="Participants solved the problem"], ' +
+                'td[title="Participants solved the problem"]'
             );
 
 
-        problemTableLinks.forEach(link => {
-            if (
-                /^x\d+$/i.test(
-                    link.textContent.trim()
-                )
-            ) {
-                link.style.setProperty(
-                    'display',
-                    'none',
-                    'important'
-                );
-            }
+        solvedElements.forEach(element => {
+            element.style.removeProperty(
+                'display'
+            );
         });
+
+
+        document
+            .querySelectorAll('.problems a')
+            .forEach(link => {
+
+                if (
+                    /^x\d+$/i.test(
+                        link.textContent.trim()
+                    )
+                ) {
+                    link.style.removeProperty(
+                        'display'
+                    );
+                }
+            });
     }
 }
 
@@ -619,7 +624,7 @@ function applyGymZen() {
 function applyGlobalZen() {
 
     // ========================================================
-    // HIDE RATING / CONTEST RATING / CONTRIBUTION
+    // RATING / CONTEST RATING / CONTRIBUTION
     // ========================================================
 
     const profileItems =
@@ -649,118 +654,21 @@ function applyGlobalZen() {
 
 
     // ========================================================
-    // HIDE TOP RATED
+    // TOP RATED WIDGET
     // ========================================================
 
-    const roundboxes =
-        document.querySelectorAll(
+    document
+        .querySelectorAll(
             '.roundbox, .sidebox'
-        );
-
-
-    roundboxes.forEach(box => {
-        if (
-            box.textContent.includes(
-                'Top rated'
-            )
-        ) {
-            box.style.setProperty(
-                'display',
-                'none',
-                'important'
-            );
-        }
-    });
-
-
-    // ========================================================
-    // DISABLE RATING LINKS
-    // ========================================================
-
-    const ratingLinks =
-        document.querySelectorAll(
-            'a[href*="/rating"]'
-        );
-
-
-    ratingLinks.forEach(link => {
-        link.removeAttribute('href');
-
-        link.style.color =
-            'inherit';
-
-        link.style.textDecoration =
-            'none';
-
-        link.style.cursor =
-            'default';
-    });
-
-
-    // ========================================================
-    // CLEAN PROFILE CONTEST HISTORY TABLE
-    // ========================================================
-
-    const dataTables =
-        document.querySelectorAll(
-            '.datatable table, .tablesorter'
-        );
-
-
-    dataTables.forEach(table => {
-
-        // Don't touch submission/status table
-        if (
-            table.classList.contains(
-                'status-frame-datatable'
-            )
-        ) {
-            return;
-        }
-
-
-        // Don't run this logic on standings.
-        // cleanStandings() handles those.
-        if (
-            window.location.pathname.includes(
-                '/standings'
-            )
-        ) {
-            return;
-        }
-
-
-        const headers =
-            Array.from(
-                table.querySelectorAll('th')
-            );
-
-
-        const colsToHide = [];
-
-
-        headers.forEach((th, index) => {
-            const text =
-                th.textContent
-                    .trim()
-                    .toUpperCase();
-
+        )
+        .forEach(box => {
 
             if (
-                [
-                    'RANK',
-                    'RATING CHANGE',
-                    'NEW RATING'
-                ].includes(text) ||
-
-                (
-                    index > 4 &&
-                    text === ''
+                box.textContent.includes(
+                    'Top rated'
                 )
             ) {
-                colsToHide.push(index);
-
-                th.style.setProperty(
+                box.style.setProperty(
                     'display',
                     'none',
                     'important'
@@ -769,186 +677,208 @@ function applyGlobalZen() {
         });
 
 
-        const rows =
-            table.querySelectorAll('tr');
+    // ========================================================
+    // RATING LINKS
+    // ========================================================
+
+    document
+        .querySelectorAll(
+            'a[href*="/rating"]'
+        )
+        .forEach(link => {
+
+            link.removeAttribute('href');
+
+            link.style.color =
+                'inherit';
+
+            link.style.textDecoration =
+                'none';
+
+            link.style.cursor =
+                'default';
+        });
 
 
-        rows.forEach(row => {
-            const cells =
+    // ========================================================
+    // PROFILE CONTEST HISTORY
+    // ========================================================
+
+    document
+        .querySelectorAll(
+            '.datatable table, .tablesorter'
+        )
+        .forEach(table => {
+
+            // Don't touch submission table.
+            if (
+                table.classList.contains(
+                    'status-frame-datatable'
+                )
+            ) {
+                return;
+            }
+
+
+            // Standings are handled separately.
+            if (isStandings) {
+                return;
+            }
+
+
+            const headers =
                 Array.from(
-                    row.querySelectorAll('td')
+                    table.querySelectorAll('th')
                 );
 
 
-            cells.forEach(
-                (cell, index) => {
-                    if (
-                        colsToHide.includes(index)
-                    ) {
-                        cell.style.setProperty(
-                            'display',
-                            'none',
-                            'important'
-                        );
-                    }
+            const colsToHide = [];
+
+
+            headers.forEach((th, index) => {
+                const text =
+                    th.textContent
+                        .trim()
+                        .toUpperCase();
+
+
+                if (
+                    [
+                        'RANK',
+                        'RATING CHANGE',
+                        'NEW RATING'
+                    ].includes(text) ||
+
+                    (
+                        index > 4 &&
+                        text === ''
+                    )
+                ) {
+                    colsToHide.push(index);
+
+                    th.style.setProperty(
+                        'display',
+                        'none',
+                        'important'
+                    );
                 }
-            );
+            });
+
+
+            table
+                .querySelectorAll('tr')
+                .forEach(row => {
+
+                    const cells =
+                        Array.from(
+                            row.querySelectorAll('td')
+                        );
+
+
+                    cells.forEach(
+                        (cell, index) => {
+
+                            if (
+                                colsToHide.includes(
+                                    index
+                                )
+                            ) {
+                                cell.style.setProperty(
+                                    'display',
+                                    'none',
+                                    'important'
+                                );
+                            }
+                        }
+                    );
+                });
         });
-    });
 }
 
 
 // ============================================================
-// 7. INITIALIZE
+// 7. RATING GRAPH
 // ============================================================
 
-function initializeZenMode() {
-    setupGymZenButton();
-
-    applyGymZen();
-
-    applyGlobalZen();
-
-    cleanVerdicts();
-
-    cleanStandings();
-}
-
-
-if (
-    document.readyState === 'loading'
-) {
-    document.addEventListener(
-        'DOMContentLoaded',
-        initializeZenMode
-    );
-} else {
-    initializeZenMode();
-}
-
-
-// ============================================================
-// 8. ACTIVE SECURITY GUARD
-//
-// Runs every 35ms.
-// ============================================================
-
-setInterval(() => {
-
-    // ========================================================
-    // GYM ZEN
-    // ========================================================
-
-    setupGymZenButton();
-
-    applyGymZen();
-
-
-    // ========================================================
-    // GLOBAL
-    // ========================================================
-
-    applyGlobalZen();
-
-
-    // ========================================================
-    // STANDINGS
-    // ========================================================
-
-    cleanStandings();
-
-
-    // ========================================================
-    // VERDICTS
-    // ========================================================
-
-    cleanVerdicts();
-
-
-    // ========================================================
-    // A. RATING GRAPH
-    // ========================================================
-
+function hideRatingGraph() {
     const graphPlaceholder =
         document.getElementById(
             'placeholder'
         );
 
+    if (!graphPlaceholder) return;
 
-    if (graphPlaceholder) {
-        graphPlaceholder.style.setProperty(
+
+    graphPlaceholder.style.setProperty(
+        'display',
+        'none',
+        'important'
+    );
+
+
+    const parentBox =
+        graphPlaceholder.parentElement;
+
+
+    if (parentBox) {
+        parentBox.style.setProperty(
             'display',
             'none',
             'important'
         );
-
-
-        const parentBox =
-            graphPlaceholder.parentElement;
-
-
-        if (parentBox) {
-            parentBox.style.setProperty(
-                'display',
-                'none',
-                'important'
-            );
-        }
     }
+}
 
 
-    // ========================================================
-    // B. "ONLY RATED" DROPDOWN
-    // ========================================================
+// ============================================================
+// 8. "ONLY RATED" DROPDOWN
+// ============================================================
 
-    const selects =
-        document.querySelectorAll(
-            'select'
-        );
+function hideOnlyRated() {
+    document
+        .querySelectorAll('select')
+        .forEach(select => {
 
+            if (
+                select.textContent.includes(
+                    'Only rated'
+                )
+            ) {
+                const form =
+                    select.closest('form');
 
-    selects.forEach(select => {
-        if (
-            select.textContent.includes(
-                'Only rated'
-            )
-        ) {
-            const form =
-                select.closest('form');
-
-
-            const container =
-                form
-                    ? form.parentElement
-                    : select.parentElement;
+                const container =
+                    form
+                        ? form.parentElement
+                        : select.parentElement;
 
 
-            if (container) {
-                container.style.setProperty(
-                    'display',
-                    'none',
-                    'important'
-                );
+                if (container) {
+                    container.style.setProperty(
+                        'display',
+                        'none',
+                        'important'
+                    );
+                }
             }
-        }
-    });
+        });
+}
 
 
-    // ========================================================
-    // C. RATING NOTIFICATIONS
-    // ========================================================
+// ============================================================
+// 9. RATING NOTIFICATIONS
+// ============================================================
 
-    const notifications =
-        document.querySelectorAll(
+function hideRatingNotifications() {
+    document
+        .querySelectorAll(
             '.macMessage-container, ' +
             '.alert, ' +
             '.notice, ' +
             '.info'
-        );
+        )
+        .forEach(notification => {
 
-
-    notifications.forEach(
-        notification => {
             if (
                 notification.textContent
                     .toLowerCase()
@@ -960,35 +890,31 @@ setInterval(() => {
                     'important'
                 );
             }
-        }
-    );
+        });
+}
 
 
-    // ========================================================
-    // D. RATING CHANGE MESSAGES
-    // ========================================================
+// ============================================================
+// 10. TALKS / MESSAGES
+// ============================================================
 
+function hideRatingMessages() {
     if (
-        window.location.href.includes(
-            '/messages'
-        ) ||
-        window.location.href.includes(
-            '/talks'
-        )
+        !window.location.href.includes('/messages') &&
+        !window.location.href.includes('/talks')
     ) {
-        const messageRows =
-            document.querySelectorAll(
-                'tr'
-            );
+        return;
+    }
 
 
-        messageRows.forEach(row => {
+    document
+        .querySelectorAll('tr')
+        .forEach(row => {
+
             if (
                 row.textContent
                     .toLowerCase()
-                    .includes(
-                        'rating change'
-                    )
+                    .includes('rating change')
             ) {
                 row.style.setProperty(
                     'display',
@@ -997,6 +923,128 @@ setInterval(() => {
                 );
             }
         });
+}
+
+
+// ============================================================
+// INITIALIZE
+// ============================================================
+
+function initializeZenMode() {
+    if (isStandings && document.body) {
+        document.body.classList.add(
+            'zen-standings'
+        );
     }
+
+    setupGymZenButton();
+
+    applyGymZen();
+
+    applyGlobalZen();
+
+    cleanStandings();
+
+    cleanVerdicts();
+
+    hideRatingGraph();
+
+    hideOnlyRated();
+
+    hideRatingNotifications();
+
+    hideRatingMessages();
+}
+
+
+if (document.readyState === 'loading') {
+    document.addEventListener(
+        'DOMContentLoaded',
+        initializeZenMode
+    );
+} else {
+    initializeZenMode();
+}
+
+
+// ============================================================
+// MUTATION OBSERVER
+//
+// React immediately when Codeforces dynamically inserts:
+// - verdicts
+// - standings
+// - menus
+// - solve counts
+// ============================================================
+
+let observerScheduled = false;
+
+const observer =
+    new MutationObserver(() => {
+
+        if (observerScheduled) return;
+
+        observerScheduled = true;
+
+
+        requestAnimationFrame(() => {
+            observerScheduled = false;
+
+            setupGymZenButton();
+
+            applyGymZen();
+
+            cleanStandings();
+
+            cleanVerdicts();
+
+            applyGlobalZen();
+
+            hideRatingGraph();
+
+            hideOnlyRated();
+
+            hideRatingNotifications();
+
+            hideRatingMessages();
+        });
+    });
+
+
+observer.observe(
+    document.documentElement,
+    {
+        childList: true,
+        subtree: true,
+        characterData: true
+    }
+);
+
+
+// ============================================================
+// BACKUP GUARD
+//
+// MutationObserver should normally catch everything.
+// 35ms remains as a backup.
+// ============================================================
+
+setInterval(() => {
+    setupGymZenButton();
+
+    applyGymZen();
+
+    cleanStandings();
+
+    cleanVerdicts();
+
+    applyGlobalZen();
+
+    hideRatingGraph();
+
+    hideOnlyRated();
+
+    hideRatingNotifications();
+
+    hideRatingMessages();
 
 }, 35);
