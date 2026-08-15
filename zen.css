@@ -1,23 +1,17 @@
-
 /* ============================================================
    CODEFORCES ZEN — EARLY PRIVACY CSS
-
-   This CSS is injected before the page renders, so sensitive
-   information doesn't flash for a frame during refresh.
    ============================================================ */
 
 
 /* ============================================================
    PROBLEM SOLVE COUNTS
 
-   Hide things like:
+   Hide:
    👤 x840
    👤 x62
+   etc.
 
-   by default.
-
-   If we're inside a Gym AND Gym Zen is OFF, JS adds
-   .gym-zen-off and these become visible again.
+   Gym Zen OFF reveals them inside gyms.
    ============================================================ */
 
 a[title="Participants solved the problem"],
@@ -30,17 +24,12 @@ html.gym-zen-off td[title="Participants solved the problem"] {
     display: revert !important;
 }
 
+
 /* ============================================================
-   VERDICTS
+   SUBMISSION VERDICTS
 
-   Hide verdict cells before they can paint.
-
-   JS changes:
-       Wrong answer on test 17
-   into:
-       WA
-
-   and THEN adds .zen-verdict-safe.
+   Hide until:
+   Wrong answer on test 17 -> WA
    ============================================================ */
 
 table.status-frame-datatable
@@ -55,15 +44,31 @@ tr[data-submission-id] > td:nth-child(6).zen-verdict-safe {
 
 
 /* ============================================================
+   BOTTOM-RIGHT POPUPS
+
+   Codeforces commonly uses jGrowl for these.
+   Also support macMessage-style containers.
+
+   Hide them until JS has checked/sanitized their contents.
+   ============================================================ */
+
+.jGrowl-notification,
+.macMessage-container {
+    visibility: hidden !important;
+}
+
+.jGrowl-notification.zen-toast-safe,
+.macMessage-container.zen-toast-safe {
+    visibility: visible !important;
+}
+
+
+/* ============================================================
    STANDINGS
 
-   Most Codeforces standings have:
-
-   # | Who | Solved | Penalty | A | B | C | ...
-
-   Hide individual-problem columns immediately.
-
-   JS also does this dynamically as a backup.
+   JS marks the actual standings table.
+   Keep only:
+   # | Who | Solved | Penalty
    ============================================================ */
 
 body.zen-standings table.standings tr > *:nth-child(n+5) {
