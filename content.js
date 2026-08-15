@@ -2,28 +2,19 @@
 // CODEFORCES ZEN
 // ============================================================
 
-const isGym = window.location.pathname.includes('/gym');
-const isStandings = window.location.pathname.includes('/standings');
+const isGym =
+    window.location.pathname.includes('/gym');
+
+const isStandings =
+    window.location.pathname.includes('/standings');
+
 
 let zenInGyms = false;
 let zenSettingLoaded = false;
 
 
 // ============================================================
-// 0. MARK STANDINGS PAGE AS EARLY AS POSSIBLE
-// ============================================================
-
-if (isStandings) {
-    // body may not exist yet at document_start, so we'll also
-    // apply this again later.
-    if (document.body) {
-        document.body.classList.add('zen-standings');
-    }
-}
-
-
-// ============================================================
-// 1. LOAD GYM ZEN SETTING
+// 0. LOAD GYM ZEN SETTING
 // ============================================================
 
 chrome.storage.local.get(['zenInGyms'], (result) => {
@@ -31,7 +22,6 @@ chrome.storage.local.get(['zenInGyms'], (result) => {
     zenSettingLoaded = true;
 
     updateGymPrivacyClass();
-
     setupGymZenButton();
     applyGymZen();
 });
@@ -39,33 +29,33 @@ chrome.storage.local.get(['zenInGyms'], (result) => {
 
 // ============================================================
 // GYM PRIVACY CLASS
-//
-// Solve counts are hidden by CSS by default.
-//
-// Only reveal them if:
-//     we are in /gym/
-//     AND Gym Zen is OFF.
 // ============================================================
 
 function updateGymPrivacyClass() {
     if (!zenSettingLoaded) return;
 
     if (isGym && !zenInGyms) {
-        document.documentElement.classList.add('gym-zen-off');
+        document.documentElement.classList.add(
+            'gym-zen-off'
+        );
     } else {
-        document.documentElement.classList.remove('gym-zen-off');
+        document.documentElement.classList.remove(
+            'gym-zen-off'
+        );
     }
 }
 
 
 // ============================================================
-// 2. VERDICT SHORTENING
+// 1. VERDICT CONVERSION
 // ============================================================
 
 function getShortVerdict(text) {
-    const t = text.trim().toLowerCase();
+    const t =
+        text.trim().toLowerCase();
 
-    // Already sanitized
+
+    // Already converted
     if (t === 'ac') return 'AC';
     if (t === 'wa') return 'WA';
     if (t === 'tle') return 'TLE';
@@ -78,52 +68,66 @@ function getShortVerdict(text) {
     if (t === 'jf') return 'JF';
     if (t === 'sv') return 'SV';
 
+
+    // Accepted
     if (
         t === 'ok' ||
-        t === 'accepted'
+        t === 'accepted' ||
+        t.includes('accepted')
     ) {
         return 'AC';
     }
+
 
     if (t.includes('wrong answer')) {
         return 'WA';
     }
 
+
     if (t.includes('time limit exceeded')) {
         return 'TLE';
     }
+
 
     if (t.includes('memory limit exceeded')) {
         return 'MLE';
     }
 
+
     if (t.includes('runtime error')) {
         return 'RE';
     }
+
 
     if (t.includes('compilation error')) {
         return 'CE';
     }
 
+
     if (t.includes('idleness limit exceeded')) {
         return 'ILE';
     }
+
 
     if (t.includes('output limit exceeded')) {
         return 'OLE';
     }
 
+
     if (t.includes('presentation error')) {
         return 'PE';
     }
+
 
     if (t.includes('judgement failed')) {
         return 'JF';
     }
 
+
     if (t.includes('security violated')) {
         return 'SV';
     }
+
 
     if (
         t.includes('hacked') ||
@@ -132,9 +136,11 @@ function getShortVerdict(text) {
         return 'HACKED';
     }
 
+
     if (t.includes('skipped')) {
         return 'SKIPPED';
     }
+
 
     if (
         t.includes('partial result') ||
@@ -143,13 +149,16 @@ function getShortVerdict(text) {
         return 'PARTIAL';
     }
 
+
     if (t.includes('running')) {
         return 'RUNNING';
     }
 
+
     if (t.includes('testing')) {
         return 'TESTING';
     }
+
 
     if (
         t.includes('in queue') ||
@@ -158,32 +167,59 @@ function getShortVerdict(text) {
         return 'QUEUED';
     }
 
+
     return null;
 }
 
 
 // ============================================================
-// CLEAN VERDICTS
+// 2. CLEAN SUBMISSION TABLE VERDICTS
 // ============================================================
 
 function cleanVerdicts() {
-    const rows = document.querySelectorAll(
-        'table.status-frame-datatable tr[data-submission-id]'
-    );
+    const rows =
+        document.querySelectorAll(
+            'table.status-frame-datatable tr[data-submission-id]'
+        );
+
 
     rows.forEach(row => {
-        const cells = row.querySelectorAll(':scope > td');
+        const cells =
+            row.querySelectorAll(
+                ':scope > td'
+            );
 
-        if (cells.length < 6) return;
 
-        const cell = cells[5];
+        if (cells.length < 6) {
+            return;
+        }
 
-        // textContent works even while CSS has hidden the cell.
-        const text = cell.textContent.trim();
 
-        if (!text) return;
+        // #
+        // When
+        // Who
+        // Problem
+        // Lang
+        // Verdict <-- index 5
+        // Time
+        // Memory
+        const cell =
+            cells[5];
 
-        const shortVerdict = getShortVerdict(text);
+
+        // Works even while hidden
+        const text =
+            cell.textContent.trim();
+
+
+        if (!text) {
+            return;
+        }
+
+
+        const shortVerdict =
+            getShortVerdict(text);
+
 
         if (shortVerdict) {
             const verdictElement =
@@ -192,102 +228,353 @@ function cleanVerdicts() {
                 cell.querySelector('.verdict-waiting') ||
                 cell.querySelector('[class*="verdict-"]');
 
+
             if (verdictElement) {
                 if (
-                    verdictElement.textContent.trim() !== shortVerdict
+                    verdictElement.textContent.trim()
+                    !==
+                    shortVerdict
                 ) {
-                    verdictElement.textContent = shortVerdict;
+                    verdictElement.textContent =
+                        shortVerdict;
                 }
 
-                verdictElement.removeAttribute('title');
+                verdictElement.removeAttribute(
+                    'title'
+                );
+
             } else {
+
                 if (
-                    cell.textContent.trim() !== shortVerdict
+                    cell.textContent.trim()
+                    !==
+                    shortVerdict
                 ) {
-                    cell.textContent = shortVerdict;
+                    cell.textContent =
+                        shortVerdict;
                 }
             }
 
-            cell.removeAttribute('title');
 
-            cell.querySelectorAll('[title]').forEach(el => {
-                el.removeAttribute('title');
-            });
+            // Remove possible tooltip leak
+            cell.removeAttribute(
+                'title'
+            );
 
-            // Reveal only after sanitizing.
-            cell.classList.add('zen-verdict-safe');
+
+            cell
+                .querySelectorAll('[title]')
+                .forEach(el => {
+                    el.removeAttribute(
+                        'title'
+                    );
+                });
+
+
+            // Reveal only after sanitizing
+            cell.classList.add(
+                'zen-verdict-safe'
+            );
 
             return;
         }
 
-        // Unknown status containing "test 17" etc:
-        // do NOT reveal.
+
+        // Unknown verdict with testcase information:
+        // keep hidden.
         const containsTestNumber =
-            /\b(?:pre)?test\s*#?\s*\d+/i.test(text);
+            /\b(?:pre)?test\s*#?\s*\d+/i.test(
+                text
+            );
+
 
         if (containsTestNumber) {
-            cell.classList.remove('zen-verdict-safe');
+            cell.classList.remove(
+                'zen-verdict-safe'
+            );
         } else {
-            cell.classList.add('zen-verdict-safe');
+            cell.classList.add(
+                'zen-verdict-safe'
+            );
         }
     });
 }
 
 
 // ============================================================
-// 3. STANDINGS PRIVACY
+// 3. BOTTOM-RIGHT POPUP VERDICTS
 //
-// Keep:
-//     #
-//     Who
-//     Solved
-//     Penalty
+// Examples:
 //
-// Hide:
-//     A B C D ...
+// Wrong answer on test 2
+// -> WA
+//
+// Time limit exceeded on test 13
+// -> TLE
+//
+// This preserves unrelated notifications such as:
+// "Solution to the problem D has been submitted successfully"
+// ============================================================
+
+function cleanVerdictPopups() {
+
+    const notifications =
+        document.querySelectorAll(
+            '.jGrowl-notification, ' +
+            '.macMessage-container'
+        );
+
+
+    notifications.forEach(notification => {
+
+        const entireText =
+            notification.textContent.trim();
+
+
+        if (!entireText) {
+            notification.classList.add(
+                'zen-toast-safe'
+            );
+
+            return;
+        }
+
+
+        const shortVerdict =
+            getShortVerdict(entireText);
+
+
+        // ====================================================
+        // THIS POPUP CONTAINS A VERDICT
+        // ====================================================
+
+        if (shortVerdict) {
+
+            let replaced = false;
+
+
+            // ------------------------------------------------
+            // Walk only TEXT NODES.
+            //
+            // This is important because we don't want to
+            // destroy Codeforces' X close button or popup HTML.
+            // ------------------------------------------------
+
+            const walker =
+                document.createTreeWalker(
+                    notification,
+                    NodeFilter.SHOW_TEXT
+                );
+
+
+            const textNodes = [];
+
+            let node;
+
+            while (
+                node = walker.nextNode()
+            ) {
+                textNodes.push(node);
+            }
+
+
+            for (
+                const textNode of textNodes
+            ) {
+                const nodeText =
+                    textNode.nodeValue.trim();
+
+
+                if (!nodeText) {
+                    continue;
+                }
+
+
+                const nodeVerdict =
+                    getShortVerdict(
+                        nodeText
+                    );
+
+
+                if (nodeVerdict) {
+                    textNode.nodeValue =
+                        nodeVerdict;
+
+                    replaced = true;
+
+                    break;
+                }
+            }
+
+
+            // ------------------------------------------------
+            // Fallback for Codeforces markup where the whole
+            // message is inside a known message element.
+            // ------------------------------------------------
+
+            if (!replaced) {
+
+                const messageElement =
+                    notification.querySelector(
+                        '.jGrowl-message, ' +
+                        '.macMessage-content, ' +
+                        '.macMessage-text'
+                    );
+
+
+                if (messageElement) {
+                    messageElement.textContent =
+                        shortVerdict;
+
+                    replaced = true;
+                }
+            }
+
+
+            // Remove testcase-related tooltip leaks
+            notification.removeAttribute(
+                'title'
+            );
+
+
+            notification
+                .querySelectorAll('[title]')
+                .forEach(el => {
+                    el.removeAttribute(
+                        'title'
+                    );
+                });
+
+
+            // Now safe to show
+            notification.classList.add(
+                'zen-toast-safe'
+            );
+
+            return;
+        }
+
+
+        // ====================================================
+        // UNKNOWN TEXT WITH "TEST 123"
+        //
+        // Fail closed: don't show it.
+        // ====================================================
+
+        const containsTestNumber =
+            /\b(?:pre)?test\s*#?\s*\d+/i.test(
+                entireText
+            );
+
+
+        if (containsTestNumber) {
+
+            notification.classList.remove(
+                'zen-toast-safe'
+            );
+
+            return;
+        }
+
+
+        // ====================================================
+        // NORMAL NON-VERDICT MESSAGE
+        //
+        // Example:
+        // "Solution has been submitted successfully"
+        //
+        // Show unchanged.
+        // ====================================================
+
+        notification.classList.add(
+            'zen-toast-safe'
+        );
+    });
+}
+
+
+// ============================================================
+// 4. STANDINGS PRIVACY
+//
+// KEEP:
+//
+// #
+// Who
+// solve count
+// Penalty
+//
+// HIDE:
+//
+// A B C D ...
 // ============================================================
 
 function cleanStandings() {
-    if (!isStandings) return;
-
-    if (document.body) {
-        document.body.classList.add('zen-standings');
+    if (!isStandings) {
+        return;
     }
 
-    const tables = document.querySelectorAll('table');
 
-    tables.forEach(table => {
-        const rows = Array.from(
-            table.querySelectorAll('tr')
+    if (document.body) {
+        document.body.classList.add(
+            'zen-standings'
+        );
+    }
+
+
+    const tables =
+        document.querySelectorAll(
+            'table'
         );
 
-        if (!rows.length) return;
 
-        let penaltyIndex = -1;
-
-
-        // ----------------------------------------------------
-        // Find the real standings table via its header.
-        // ----------------------------------------------------
-
-        for (const row of rows) {
-            const cells = Array.from(
-                row.querySelectorAll(
-                    ':scope > th, :scope > td'
+    tables.forEach(table => {
+        const rows =
+            Array.from(
+                table.querySelectorAll(
+                    'tr'
                 )
             );
 
-            const texts = cells.map(cell =>
-                cell.textContent
-                    .trim()
-                    .toUpperCase()
-            );
+
+        if (!rows.length) {
+            return;
+        }
+
+
+        let penaltyIndex =
+            -1;
+
+
+        // Find actual standings table
+        for (const row of rows) {
+
+            const cells =
+                Array.from(
+                    row.querySelectorAll(
+                        ':scope > th, :scope > td'
+                    )
+                );
+
+
+            const texts =
+                cells.map(cell =>
+                    cell.textContent
+                        .trim()
+                        .toUpperCase()
+                );
+
 
             const whoIndex =
-                texts.indexOf('WHO');
+                texts.indexOf(
+                    'WHO'
+                );
+
 
             const currentPenaltyIndex =
-                texts.indexOf('PENALTY');
+                texts.indexOf(
+                    'PENALTY'
+                );
+
 
             if (
                 whoIndex !== -1 &&
@@ -301,59 +588,70 @@ function cleanStandings() {
         }
 
 
-        // Not a standings table.
-        if (penaltyIndex === -1) return;
+        // Not standings table
+        if (penaltyIndex === -1) {
+            return;
+        }
 
 
-        // ----------------------------------------------------
-        // Mark it for immediate CSS handling on subsequent
-        // dynamic updates.
-        // ----------------------------------------------------
-
-        table.classList.add('standings');
+        // Mark actual standings table
+        table.classList.add(
+            'standings'
+        );
 
 
-        // ----------------------------------------------------
-        // Hide every problem column.
-        // ----------------------------------------------------
-
+        // Hide every column after Penalty
         rows.forEach(row => {
-            const cells = Array.from(
-                row.querySelectorAll(
-                    ':scope > th, :scope > td'
-                )
-            );
 
-            cells.forEach((cell, index) => {
-                if (index > penaltyIndex) {
-                    cell.style.setProperty(
-                        'display',
-                        'none',
-                        'important'
-                    );
+            const cells =
+                Array.from(
+                    row.querySelectorAll(
+                        ':scope > th, :scope > td'
+                    )
+                );
+
+
+            cells.forEach(
+                (cell, index) => {
+
+                    if (
+                        index > penaltyIndex
+                    ) {
+                        cell.style.setProperty(
+                            'display',
+                            'none',
+                            'important'
+                        );
+                    }
                 }
-            });
+            );
         });
     });
 }
 
 
 // ============================================================
-// 4. GYM ZEN BUTTON
+// 5. GYM ZEN BUTTON
 // ============================================================
 
 function setupGymZenButton() {
-    if (!zenSettingLoaded) return;
+    if (!zenSettingLoaded) {
+        return;
+    }
+
 
     const topMenu =
         document.querySelector(
             '.menu-list-container ul'
         );
 
-    if (!topMenu) return;
+
+    if (!topMenu) {
+        return;
+    }
 
 
-    // Already added.
+    // Already added
     if (
         document.getElementById(
             'gym-zen-toggle'
@@ -364,14 +662,20 @@ function setupGymZenButton() {
 
 
     const toggleLi =
-        document.createElement('li');
+        document.createElement(
+            'li'
+        );
+
 
     const toggleLink =
-        document.createElement('a');
+        document.createElement(
+            'a'
+        );
 
 
     toggleLink.id =
         'gym-zen-toggle';
+
 
     toggleLink.href =
         '#';
@@ -385,47 +689,61 @@ function setupGymZenButton() {
             : '<span style="font-size: 13px;">⚡</span> Gym Zen: <b>OFF</b>';
 
 
+    // ========================================================
+    // STYLE
+    // ========================================================
+
     toggleLink.style.display =
         'inline-block';
+
 
     toggleLink.style.padding =
         '2px 12px';
 
+
     toggleLink.style.marginLeft =
         '15px';
 
+
     toggleLink.style.borderRadius =
         '20px';
+
 
     toggleLink.style.backgroundColor =
         zenInGyms
             ? '#2c3e50'
             : '#e0e0e0';
 
+
     toggleLink.style.color =
         zenInGyms
             ? '#ffffff'
             : '#666666';
 
+
     toggleLink.style.textDecoration =
         'none';
 
+
     toggleLink.style.boxShadow =
         '0 2px 4px rgba(0,0,0,0.1)';
+
 
     toggleLink.style.transition =
         'all 0.2s ease-in-out';
 
 
-    // --------------------------------------------------------
-    // Hover
-    // --------------------------------------------------------
+    // ========================================================
+    // HOVER
+    // ========================================================
 
     toggleLink.addEventListener(
         'mouseenter',
         () => {
+
             toggleLink.style.transform =
                 'translateY(-1px)';
+
 
             toggleLink.style.boxShadow =
                 '0 4px 8px rgba(0,0,0,0.15)';
@@ -436,8 +754,10 @@ function setupGymZenButton() {
     toggleLink.addEventListener(
         'mouseleave',
         () => {
+
             toggleLink.style.transform =
                 'translateY(0)';
+
 
             toggleLink.style.boxShadow =
                 '0 2px 4px rgba(0,0,0,0.1)';
@@ -445,19 +765,23 @@ function setupGymZenButton() {
     );
 
 
-    // --------------------------------------------------------
-    // Click
-    // --------------------------------------------------------
+    // ========================================================
+    // CLICK
+    // ========================================================
 
     toggleLink.addEventListener(
         'click',
         (e) => {
+
             e.preventDefault();
+
 
             chrome.storage.local.set(
                 {
-                    zenInGyms: !zenInGyms
+                    zenInGyms:
+                        !zenInGyms
                 },
+
                 () => {
                     window.location.reload();
                 }
@@ -466,32 +790,36 @@ function setupGymZenButton() {
     );
 
 
-    toggleLi.appendChild(toggleLink);
-    topMenu.appendChild(toggleLi);
+    toggleLi.appendChild(
+        toggleLink
+    );
+
+
+    topMenu.appendChild(
+        toggleLi
+    );
 }
 
 
 // ============================================================
-// 5. APPLY GYM ZEN
+// 6. APPLY GYM ZEN
 // ============================================================
 
 function applyGymZen() {
-    if (!zenSettingLoaded) return;
+    if (!zenSettingLoaded) {
+        return;
+    }
+
 
     updateGymPrivacyClass();
 
 
-    // Outside gyms:
-    // always Zen.
-    //
-    // Inside gyms:
-    // depends on toggle.
     const shouldHideContestData =
         !isGym || zenInGyms;
 
 
     // ========================================================
-    // MENU ITEMS
+    // MENU
     // ========================================================
 
     const menuLinks =
@@ -502,13 +830,14 @@ function applyGymZen() {
 
 
     menuLinks.forEach(link => {
+
         const tabText =
             link.textContent
                 .trim()
                 .toUpperCase();
 
 
-        // Standings are intentionally NOT hidden anymore.
+        // Standings intentionally allowed.
         const tabsToHide = [
             'RATING',
             'RATING CHANGES',
@@ -518,6 +847,7 @@ function applyGymZen() {
 
 
         if (shouldHideContestData) {
+
             tabsToHide.push(
                 'STATUS'
             );
@@ -525,8 +855,12 @@ function applyGymZen() {
 
 
         if (
-            !tabText.includes('GYM ZEN') &&
-            tabsToHide.includes(tabText)
+            !tabText.includes(
+                'GYM ZEN'
+            ) &&
+            tabsToHide.includes(
+                tabText
+            )
         ) {
             link.parentElement.style.setProperty(
                 'display',
@@ -539,13 +873,10 @@ function applyGymZen() {
 
     // ========================================================
     // PROBLEM SOLVE COUNTS
-    //
-    // CSS already hides these BEFORE rendering.
-    //
-    // This JS is only a backup for weird Codeforces markup.
     // ========================================================
 
     if (shouldHideContestData) {
+
         const solvedElements =
             document.querySelectorAll(
                 'a[title="Participants solved the problem"], ' +
@@ -554,6 +885,7 @@ function applyGymZen() {
 
 
         solvedElements.forEach(element => {
+
             element.style.setProperty(
                 'display',
                 'none',
@@ -562,9 +894,10 @@ function applyGymZen() {
         });
 
 
-        // Backup for x123-style links.
         document
-            .querySelectorAll('.problems a')
+            .querySelectorAll(
+                '.problems a'
+            )
             .forEach(link => {
 
                 if (
@@ -580,11 +913,12 @@ function applyGymZen() {
                 }
             });
 
+
     } else {
 
-        // Gym Zen OFF:
-        // undo inline hiding if this script had previously
-        // applied it.
+        // Gym Zen OFF.
+        // Restore solve counts inside gyms.
+
         const solvedElements =
             document.querySelectorAll(
                 'a[title="Participants solved the problem"], ' +
@@ -593,6 +927,7 @@ function applyGymZen() {
 
 
         solvedElements.forEach(element => {
+
             element.style.removeProperty(
                 'display'
             );
@@ -600,7 +935,9 @@ function applyGymZen() {
 
 
         document
-            .querySelectorAll('.problems a')
+            .querySelectorAll(
+                '.problems a'
+            )
             .forEach(link => {
 
                 if (
@@ -618,7 +955,7 @@ function applyGymZen() {
 
 
 // ============================================================
-// 6. GLOBAL ZEN
+// 7. GLOBAL ZEN
 // ============================================================
 
 function applyGlobalZen() {
@@ -635,14 +972,21 @@ function applyGlobalZen() {
 
 
     profileItems.forEach(item => {
+
         const text =
             item.textContent.trim();
 
 
         if (
-            text.includes('Rating:') ||
-            text.includes('Contest rating:') ||
-            text.includes('Contribution:')
+            text.includes(
+                'Rating:'
+            ) ||
+            text.includes(
+                'Contest rating:'
+            ) ||
+            text.includes(
+                'Contribution:'
+            )
         ) {
             item.style.setProperty(
                 'display',
@@ -654,7 +998,7 @@ function applyGlobalZen() {
 
 
     // ========================================================
-    // TOP RATED WIDGET
+    // TOP RATED
     // ========================================================
 
     document
@@ -687,13 +1031,18 @@ function applyGlobalZen() {
         )
         .forEach(link => {
 
-            link.removeAttribute('href');
+            link.removeAttribute(
+                'href'
+            );
+
 
             link.style.color =
                 'inherit';
 
+
             link.style.textDecoration =
                 'none';
+
 
             link.style.cursor =
                 'default';
@@ -710,7 +1059,7 @@ function applyGlobalZen() {
         )
         .forEach(table => {
 
-            // Don't touch submission table.
+            // Don't modify status table
             if (
                 table.classList.contains(
                     'status-frame-datatable'
@@ -720,7 +1069,7 @@ function applyGlobalZen() {
             }
 
 
-            // Standings are handled separately.
+            // Standings handled separately
             if (isStandings) {
                 return;
             }
@@ -728,50 +1077,65 @@ function applyGlobalZen() {
 
             const headers =
                 Array.from(
-                    table.querySelectorAll('th')
+                    table.querySelectorAll(
+                        'th'
+                    )
                 );
 
 
-            const colsToHide = [];
+            const colsToHide =
+                [];
 
 
-            headers.forEach((th, index) => {
-                const text =
-                    th.textContent
-                        .trim()
-                        .toUpperCase();
+            headers.forEach(
+                (th, index) => {
+
+                    const text =
+                        th.textContent
+                            .trim()
+                            .toUpperCase();
 
 
-                if (
-                    [
-                        'RANK',
-                        'RATING CHANGE',
-                        'NEW RATING'
-                    ].includes(text) ||
+                    if (
+                        [
+                            'RANK',
+                            'RATING CHANGE',
+                            'NEW RATING'
+                        ].includes(text)
 
-                    (
-                        index > 4 &&
-                        text === ''
-                    )
-                ) {
-                    colsToHide.push(index);
+                        ||
 
-                    th.style.setProperty(
-                        'display',
-                        'none',
-                        'important'
-                    );
+                        (
+                            index > 4 &&
+                            text === ''
+                        )
+                    ) {
+                        colsToHide.push(
+                            index
+                        );
+
+
+                        th.style.setProperty(
+                            'display',
+                            'none',
+                            'important'
+                        );
+                    }
                 }
-            });
+            );
 
 
             table
-                .querySelectorAll('tr')
+                .querySelectorAll(
+                    'tr'
+                )
                 .forEach(row => {
 
                     const cells =
                         Array.from(
-                            row.querySelectorAll('td')
+                            row.querySelectorAll(
+                                'td'
+                            )
                         );
 
 
@@ -797,16 +1161,20 @@ function applyGlobalZen() {
 
 
 // ============================================================
-// 7. RATING GRAPH
+// 8. HIDE RATING GRAPH
 // ============================================================
 
 function hideRatingGraph() {
+
     const graphPlaceholder =
         document.getElementById(
             'placeholder'
         );
 
-    if (!graphPlaceholder) return;
+
+    if (!graphPlaceholder) {
+        return;
+    }
 
 
     graphPlaceholder.style.setProperty(
@@ -821,6 +1189,7 @@ function hideRatingGraph() {
 
 
     if (parentBox) {
+
         parentBox.style.setProperty(
             'display',
             'none',
@@ -831,12 +1200,15 @@ function hideRatingGraph() {
 
 
 // ============================================================
-// 8. "ONLY RATED" DROPDOWN
+// 9. HIDE "ONLY RATED"
 // ============================================================
 
 function hideOnlyRated() {
+
     document
-        .querySelectorAll('select')
+        .querySelectorAll(
+            'select'
+        )
         .forEach(select => {
 
             if (
@@ -845,7 +1217,10 @@ function hideOnlyRated() {
                 )
             ) {
                 const form =
-                    select.closest('form');
+                    select.closest(
+                        'form'
+                    );
+
 
                 const container =
                     form
@@ -854,6 +1229,7 @@ function hideOnlyRated() {
 
 
                 if (container) {
+
                     container.style.setProperty(
                         'display',
                         'none',
@@ -866,23 +1242,37 @@ function hideOnlyRated() {
 
 
 // ============================================================
-// 9. RATING NOTIFICATIONS
+// 10. HIDE RATING-RELATED NOTIFICATIONS
+//
+// IMPORTANT:
+//
+// Don't hide verdict popups here.
+// Those are handled by cleanVerdictPopups().
 // ============================================================
 
 function hideRatingNotifications() {
-    document
-        .querySelectorAll(
+
+    const notifications =
+        document.querySelectorAll(
+            '.jGrowl-notification, ' +
             '.macMessage-container, ' +
             '.alert, ' +
-            '.notice, ' +
-            '.info'
-        )
-        .forEach(notification => {
+            '.notice'
+        );
+
+
+    notifications.forEach(
+        notification => {
+
+            const text =
+                notification.textContent
+                    .toLowerCase();
+
 
             if (
-                notification.textContent
-                    .toLowerCase()
-                    .includes('rating')
+                text.includes(
+                    'rating'
+                )
             ) {
                 notification.style.setProperty(
                     'display',
@@ -890,31 +1280,41 @@ function hideRatingNotifications() {
                     'important'
                 );
             }
-        });
+        }
+    );
 }
 
 
 // ============================================================
-// 10. TALKS / MESSAGES
+// 11. TALKS / MESSAGES
 // ============================================================
 
 function hideRatingMessages() {
+
     if (
-        !window.location.href.includes('/messages') &&
-        !window.location.href.includes('/talks')
+        !window.location.href.includes(
+            '/messages'
+        ) &&
+        !window.location.href.includes(
+            '/talks'
+        )
     ) {
         return;
     }
 
 
     document
-        .querySelectorAll('tr')
+        .querySelectorAll(
+            'tr'
+        )
         .forEach(row => {
 
             if (
                 row.textContent
                     .toLowerCase()
-                    .includes('rating change')
+                    .includes(
+                        'rating change'
+                    )
             ) {
                 row.style.setProperty(
                     'display',
@@ -927,25 +1327,22 @@ function hideRatingMessages() {
 
 
 // ============================================================
-// INITIALIZE
+// 12. RUN ALL CLEANUP
 // ============================================================
 
-function initializeZenMode() {
-    if (isStandings && document.body) {
-        document.body.classList.add(
-            'zen-standings'
-        );
-    }
+function runZenCleanup() {
 
     setupGymZenButton();
 
     applyGymZen();
 
-    applyGlobalZen();
-
     cleanStandings();
 
     cleanVerdicts();
+
+    cleanVerdictPopups();
+
+    applyGlobalZen();
 
     hideRatingGraph();
 
@@ -957,56 +1354,76 @@ function initializeZenMode() {
 }
 
 
-if (document.readyState === 'loading') {
+// ============================================================
+// 13. INITIALIZE
+// ============================================================
+
+function initializeZenMode() {
+
+    if (
+        isStandings &&
+        document.body
+    ) {
+        document.body.classList.add(
+            'zen-standings'
+        );
+    }
+
+
+    runZenCleanup();
+}
+
+
+if (
+    document.readyState ===
+    'loading'
+) {
+
     document.addEventListener(
         'DOMContentLoaded',
         initializeZenMode
     );
+
 } else {
+
     initializeZenMode();
 }
 
 
 // ============================================================
-// MUTATION OBSERVER
+// 14. MUTATION OBSERVER
 //
-// React immediately when Codeforces dynamically inserts:
-// - verdicts
-// - standings
-// - menus
-// - solve counts
+// This is what reacts essentially immediately to:
+//
+// - new verdicts
+// - bottom-right verdict popups
+// - AJAX table updates
+// - dynamically loaded menus
 // ============================================================
 
-let observerScheduled = false;
+let observerScheduled =
+    false;
+
 
 const observer =
     new MutationObserver(() => {
 
-        if (observerScheduled) return;
+        if (observerScheduled) {
+            return;
+        }
 
-        observerScheduled = true;
+
+        observerScheduled =
+            true;
 
 
-        requestAnimationFrame(() => {
-            observerScheduled = false;
+        queueMicrotask(() => {
 
-            setupGymZenButton();
+            observerScheduled =
+                false;
 
-            applyGymZen();
 
-            cleanStandings();
-
-            cleanVerdicts();
-
-            applyGlobalZen();
-
-            hideRatingGraph();
-
-            hideOnlyRated();
-
-            hideRatingNotifications();
-
-            hideRatingMessages();
+            runZenCleanup();
         });
     });
 
@@ -1022,29 +1439,14 @@ observer.observe(
 
 
 // ============================================================
-// BACKUP GUARD
+// 15. BACKUP SECURITY GUARD
 //
-// MutationObserver should normally catch everything.
-// 35ms remains as a backup.
+// MutationObserver should handle almost everything.
+// Keep your 35ms check as backup.
 // ============================================================
 
 setInterval(() => {
-    setupGymZenButton();
 
-    applyGymZen();
-
-    cleanStandings();
-
-    cleanVerdicts();
-
-    applyGlobalZen();
-
-    hideRatingGraph();
-
-    hideOnlyRated();
-
-    hideRatingNotifications();
-
-    hideRatingMessages();
+    runZenCleanup();
 
 }, 35);
