@@ -5,13 +5,6 @@
 
 /* ============================================================
    PROBLEM SOLVE COUNTS
-
-   Hide:
-   👤 x840
-   👤 x62
-   etc.
-
-   Gym Zen OFF reveals them inside gyms.
    ============================================================ */
 
 a[title="Participants solved the problem"],
@@ -26,10 +19,7 @@ html.gym-zen-off td[title="Participants solved the problem"] {
 
 
 /* ============================================================
-   SUBMISSION VERDICTS
-
-   Hide until:
-   Wrong answer on test 17 -> WA
+   MAIN SUBMISSION TABLE VERDICTS
    ============================================================ */
 
 table.status-frame-datatable
@@ -44,12 +34,31 @@ tr[data-submission-id] > td:nth-child(6).zen-verdict-safe {
 
 
 /* ============================================================
+   "LAST SUBMISSIONS" SIDEBAR
+
+   The third column is Verdict.
+
+   Start hidden so:
+       Wrong answer on test 6
+   cannot flash before becoming:
+       WA
+
+   JS reveals safe cells.
+   ============================================================ */
+
+.zen-last-submissions
+tr > td:nth-child(3) {
+    visibility: hidden !important;
+}
+
+.zen-last-submissions
+tr > td:nth-child(3).zen-last-verdict-safe {
+    visibility: visible !important;
+}
+
+
+/* ============================================================
    BOTTOM-RIGHT POPUPS
-
-   Codeforces commonly uses jGrowl for these.
-   Also support macMessage-style containers.
-
-   Hide them until JS has checked/sanitized their contents.
    ============================================================ */
 
 .jGrowl-notification,
@@ -66,11 +75,15 @@ tr[data-submission-id] > td:nth-child(6).zen-verdict-safe {
 /* ============================================================
    STANDINGS
 
-   JS marks the actual standings table.
-   Keep only:
+   Keep:
    # | Who | Solved | Penalty
+
+   Hide:
+   A | B | C | ...
    ============================================================ */
 
-body.zen-standings table.standings tr > *:nth-child(n+5) {
+body.zen-standings
+table.standings
+tr > *:nth-child(n+5) {
     display: none !important;
 }
