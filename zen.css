@@ -1,1 +1,71 @@
 
+/* ============================================================
+   CODEFORCES ZEN — EARLY PRIVACY CSS
+
+   This CSS is injected before the page renders, so sensitive
+   information doesn't flash for a frame during refresh.
+   ============================================================ */
+
+
+/* ============================================================
+   PROBLEM SOLVE COUNTS
+
+   Hide things like:
+   👤 x840
+   👤 x62
+
+   by default.
+
+   If we're inside a Gym AND Gym Zen is OFF, JS adds
+   .gym-zen-off and these become visible again.
+   ============================================================ */
+
+a[title="Participants solved the problem"],
+td[title="Participants solved the problem"] {
+    display: none !important;
+}
+
+html.gym-zen-off a[title="Participants solved the problem"],
+html.gym-zen-off td[title="Participants solved the problem"] {
+    display: revert !important;
+}
+
+/* ============================================================
+   VERDICTS
+
+   Hide verdict cells before they can paint.
+
+   JS changes:
+       Wrong answer on test 17
+   into:
+       WA
+
+   and THEN adds .zen-verdict-safe.
+   ============================================================ */
+
+table.status-frame-datatable
+tr[data-submission-id] > td:nth-child(6) {
+    visibility: hidden !important;
+}
+
+table.status-frame-datatable
+tr[data-submission-id] > td:nth-child(6).zen-verdict-safe {
+    visibility: visible !important;
+}
+
+
+/* ============================================================
+   STANDINGS
+
+   Most Codeforces standings have:
+
+   # | Who | Solved | Penalty | A | B | C | ...
+
+   Hide individual-problem columns immediately.
+
+   JS also does this dynamically as a backup.
+   ============================================================ */
+
+body.zen-standings table.standings tr > *:nth-child(n+5) {
+    display: none !important;
+}
