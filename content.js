@@ -220,4 +220,4 @@ setInterval(() => {
             element.removeAttribute('title');
         }
     });
-}, 500);
+}, 50);
