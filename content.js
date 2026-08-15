@@ -182,13 +182,42 @@ setInterval(() => {
         }
     });
 
-    // D. Hide system messages in the "Talks" (Inbox) page
+    // D. Hide system messages in Talks
     if (window.location.href.includes('/messages') || window.location.href.includes('/talks')) {
-        const messageRows = document.querySelectorAll('tr'); // Table rows in the inbox
+        const messageRows = document.querySelectorAll('tr');
         messageRows.forEach(row => {
             if (row.innerText.toLowerCase().includes('rating change')) {
                 row.style.setProperty('display', 'none', 'important');
             }
         });
     }
+
+    // E. Hide testcase numbers from submission verdicts
+    const verdictElements = document.querySelectorAll(
+        '.status-cell span, .status-cell a, .verdict-accepted, .verdict-rejected'
+    );
+
+    verdictElements.forEach(element => {
+        const text = element.innerText.trim().toLowerCase();
+
+        let shortVerdict = null;
+
+        if (text === 'ok' || text === 'accepted') shortVerdict = 'AC';
+        else if (text.includes('wrong answer')) shortVerdict = 'WA';
+        else if (text.includes('time limit exceeded')) shortVerdict = 'TLE';
+        else if (text.includes('memory limit exceeded')) shortVerdict = 'MLE';
+        else if (text.includes('runtime error')) shortVerdict = 'RE';
+        else if (text.includes('compilation error')) shortVerdict = 'CE';
+        else if (text.includes('idleness limit exceeded')) shortVerdict = 'ILE';
+        else if (text.includes('presentation error')) shortVerdict = 'PE';
+        else if (text.includes('judgement failed')) shortVerdict = 'JF';
+        else if (text.includes('security violated')) shortVerdict = 'SV';
+        else if (text.includes('hacked')) shortVerdict = 'HACKED';
+        else if (text.includes('skipped')) shortVerdict = 'SKIPPED';
+
+        if (shortVerdict) {
+            element.innerText = shortVerdict;
+            element.removeAttribute('title');
+        }
+    });
 }, 500);
